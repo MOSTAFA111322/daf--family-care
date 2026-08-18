@@ -5,7 +5,9 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
-import { Platform } from "react-native";
+import { AppState, Platform, Text, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as LocalAuthentication from "expo-local-authentication";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import {
@@ -32,6 +34,28 @@ export default function RootLayout() {
 
   const [insets, setInsets] = useState<EdgeInsets>(initialInsets);
   const [frame, setFrame] = useState<Rect>(initialFrame);
+  const [locked, setLocked] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    let backgroundAt: number | null = null;
+    const unlockIfNeeded = async () => {
+      const enabled = (await AsyncStorage.getItem("dafء-lock-enabled")) === "true";
+      if (!enabled) return;
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      if (!hasHardware || !enrolled) return;
+      setLocked(true);
+      const result = await LocalAuthentication.authenticateAsync({ promptMessage: "افتح تطبيق دفء", fallbackLabel: "استخدم رمز الجهاز" });
+      setLocked(!result.success);
+    };
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "background") backgroundAt = Date.now();
+      if (state === "active" && backgroundAt && Date.now() - backgroundAt > 1000) unlockIfNeeded();
+    });
+    unlockIfNeeded();
+    return () => subscription.remove();
+  }, []);
 
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {
@@ -85,10 +109,7 @@ export default function RootLayout() {
           {/* Default to hiding native headers so raw route segments don't appear (e.g. "(tabs)", "products/[id]"). */}
           {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
           {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="oauth/callback" />
-          </Stack>
+          {locked ? <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#FFF9F3", padding: 28 }}><Text style={{ fontSize: 28, fontWeight: "700", color: "#2D2926" }}>دفء محمي</Text><Text style={{ color: "#8C8178", marginTop: 10, textAlign: "center" }}>استخدم Face ID أو البصمة للعودة إلى بيانات الأسرة.</Text></View> : <Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack>}
           <StatusBar style="auto" />
         </QueryClientProvider>
       </trpc.Provider>

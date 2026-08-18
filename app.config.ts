@@ -86,6 +86,7 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    ["expo-local-authentication", { faceIDPermission: "السماح لتطبيق دفء باستخدام Face ID لحماية بيانات الأسرة." }],
     [
       "expo-audio",
       {
