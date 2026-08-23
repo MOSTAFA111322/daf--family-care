@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import { buildFamilyReportHtml, calculateWeeklySummary } from "../lib/family-care";
+import { extractBackupPairs, isValidBackupEnvelope, shouldAbortRestore } from "../lib/backup-utils";
 import { appendReportOperation, buildReportOperationsCsv, clearReportOperations, createReportOperation, DEFAULT_REPORT_STATUS_DURATIONS, dismissStatusMessage, filterReportOperations, getReportStatusDuration, getStatusExpiry, isStatusMessageVisible, removeReportOperation, toggleSortDirection, validateReportLogCustomRange } from "../lib/report-ui";
 
 describe("family care analytics", () => {
+  it("validates restore envelopes and ignores unsupported backup keys", () => {
+    expect(isValidBackupEnvelope({ version: 1, data: { "dafء-members": "[]" } })).toBe(true);
+    expect(isValidBackupEnvelope({ version: 2, data: {} })).toBe(false);
+    const pairs = extractBackupPairs({ "dafء-members": "[]", secret: "hidden", "dafء-events": 4 }, ["dafء-members", "dafء-events"]);
+    expect(pairs).toEqual([["dafء-members", "[]"]]);
+    expect(shouldAbortRestore([])).toBe(true);
+    expect(shouldAbortRestore(pairs)).toBe(false);
+  });
   it("updates the weekly family summary after a new mood entry", () => {
     const now = new Date("2026-08-23T12:00:00");
     const summary = calculateWeeklySummary([
