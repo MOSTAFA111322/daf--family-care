@@ -1,3 +1,5 @@
+import type { ReportOperation } from "@/lib/report-ui";
+
 export type FamilyReportMember = {
   id: string;
   name: string;
@@ -55,6 +57,7 @@ export function buildFamilyReportHtml(
   members: FamilyReportMember[],
   histories: Record<string, FamilyReportMood[]>,
   periodLabel: string,
+  reportLog: ReportOperation[] = [],
 ): string {
   const rows = members.map((member) => {
     const entries = histories[member.id] ?? [];
@@ -64,5 +67,7 @@ export function buildFamilyReportHtml(
   }).join("");
   const totalEntries = Object.values(histories).reduce((total, entries) => total + entries.length, 0);
   const average = totalEntries ? Object.values(histories).flat().reduce((sum, entry) => sum + entry.score, 0) / totalEntries : 0;
-  return `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><style>body{font-family:Arial;color:#352D2A;padding:28px}h1{color:#8D5E4D}h2{margin-top:26px}table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid #eadfd8;text-align:right}th{background:#F6DED0} .metric{display:inline-block;background:#FFF0E8;padding:12px;margin:4px;border-radius:10px}</style></head><body><h1>تقرير دفء — ملخص الأسرة</h1><p>الفترة: ${escapeHtml(periodLabel)}</p><div class="metric">عدد الأفراد: ${members.length}</div><div class="metric">عدد التسجيلات: ${totalEntries}</div><div class="metric">متوسط الأسرة: ${average ? average.toFixed(1) : "—"} من 5</div><h2>نظرة عامة على الأسرة</h2><table><tr><th>الفرد</th><th>صلة القرابة</th><th>آخر شعور</th><th>المتوسط</th><th>آخر ملاحظة</th></tr>${rows || "<tr><td colspan=5>لا توجد بيانات</td></tr>"}</table><p style="margin-top:28px;color:#7b6b63">هذا التقرير محلي ومختصر، وقد تم إنشاؤه من البيانات المحفوظة على جهازك.</p></body></html>`;
+  const logRows = reportLog.map((operation) => `<tr><td>${escapeHtml(operation.label)}</td><td>${escapeHtml(new Date(operation.createdAt).toLocaleString("ar-SA"))}</td></tr>`).join("");
+  const logSection = `<h2>سجل عمليات التقارير</h2><table><tr><th>العملية</th><th>التاريخ والوقت</th></tr>${logRows || "<tr><td colspan=2>لا توجد عمليات مسجلة</td></tr>"}</table>`;
+  return `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><style>body{font-family:Arial;color:#352D2A;padding:28px}h1{color:#8D5E4D}h2{margin-top:26px}table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid #eadfd8;text-align:right}th{background:#F6DED0} .metric{display:inline-block;background:#FFF0E8;padding:12px;margin:4px;border-radius:10px}</style></head><body><h1>تقرير دفء — ملخص الأسرة</h1><p>الفترة: ${escapeHtml(periodLabel)}</p><div class="metric">عدد الأفراد: ${members.length}</div><div class="metric">عدد التسجيلات: ${totalEntries}</div><div class="metric">متوسط الأسرة: ${average ? average.toFixed(1) : "—"} من 5</div><h2>نظرة عامة على الأسرة</h2><table><tr><th>الفرد</th><th>صلة القرابة</th><th>آخر شعور</th><th>المتوسط</th><th>آخر ملاحظة</th></tr>${rows || "<tr><td colspan=5>لا توجد بيانات</td></tr>"}</table>${logSection}<p style="margin-top:28px;color:#7b6b63">هذا التقرير محلي ومختصر، وقد تم إنشاؤه من البيانات المحفوظة على جهازك.</p></body></html>`;
 }

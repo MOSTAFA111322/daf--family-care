@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildFamilyReportHtml, calculateWeeklySummary } from "../lib/family-care";
-import { dismissStatusMessage, getStatusExpiry, isStatusMessageVisible, toggleSortDirection } from "../lib/report-ui";
+import { appendReportOperation, clearReportOperations, createReportOperation, DEFAULT_REPORT_STATUS_DURATIONS, dismissStatusMessage, getReportStatusDuration, getStatusExpiry, isStatusMessageVisible, toggleSortDirection } from "../lib/report-ui";
 
 describe("family care analytics", () => {
   it("updates the weekly family summary after a new mood entry", () => {
@@ -34,6 +34,15 @@ describe("family care analytics", () => {
     expect(dismissStatusMessage()).toBeNull();
   });
 
+  it("uses an independent duration for each report action and clears the log", () => {
+    expect(getReportStatusDuration("create", DEFAULT_REPORT_STATUS_DURATIONS)).toBe(4500);
+    expect(getReportStatusDuration("share", DEFAULT_REPORT_STATUS_DURATIONS)).toBe(6000);
+    expect(getReportStatusDuration("download", DEFAULT_REPORT_STATUS_DURATIONS)).toBe(8000);
+    const operation = createReportOperation("share", "2026-08-23T12:00:00.000Z");
+    expect(appendReportOperation([], operation)).toEqual([operation]);
+    expect(clearReportOperations()).toEqual([]);
+  });
+
   it("builds a safe family report even when a member has no entries", () => {
     const html = buildFamilyReportHtml([
       { id: "1", name: "سارة & عمر", role: "الأسرة", mood: "هادئة", note: "ملاحظة" },
@@ -41,10 +50,12 @@ describe("family care analytics", () => {
     ], {
       "1": [{ mood: "سعيد", score: 5, date: "2026-08-23" }],
       "2": [],
-    }, "أغسطس 2026");
+    }, "أغسطس 2026", [createReportOperation("download", "2026-08-23T12:00:00.000Z")]);
 
     expect(html).toContain("سارة &amp; عمر");
     expect(html).toContain("لا توجد بيانات");
     expect(html).toContain("عدد التسجيلات: 1");
+    expect(html).toContain("تنزيل تقرير");
+    expect(html).toContain("2026");
   });
 });
