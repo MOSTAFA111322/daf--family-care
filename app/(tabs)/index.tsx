@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 
+type MoodEntry = { score: number; date: string };
 type FamilyMember = {
   id: string;
   name: string;
@@ -40,11 +41,29 @@ export default function HomeScreen() {
   const [showAddMember, setShowAddMember] = useState(false);
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState("");
+  const [weeklySummaryEnabled, setWeeklySummaryEnabled] = useState(true);
+  const [weeklySummary, setWeeklySummary] = useState({ average: 0, recorded: 0 });
 
   useEffect(() => {
     AsyncStorage.getItem("dafء-members").then((saved) => {
       if (saved) setMembers(JSON.parse(saved));
     });
+  }, []);
+
+  useEffect(() => {
+    const loadWeeklySummary = async () => {
+      const enabled = await AsyncStorage.getItem("dafء-weekly-summary");
+      setWeeklySummaryEnabled(enabled !== "false");
+      const saved = await AsyncStorage.getItem("dafء-members");
+      const list: FamilyMember[] = saved ? JSON.parse(saved) : initialMembers;
+      const histories = await Promise.all(list.map(async (item) => {
+        const raw = await AsyncStorage.getItem(`dafء-moods-${item.id}`);
+        return raw ? (JSON.parse(raw) as MoodEntry[]).slice(-7) : [];
+      }));
+      const entries = histories.flat();
+      setWeeklySummary({ recorded: entries.length, average: entries.length ? entries.reduce((sum, item) => sum + item.score, 0) / entries.length : 0 });
+    };
+    loadWeeklySummary();
   }, []);
 
   const saveMembers = async (next: FamilyMember[]) => {
@@ -102,6 +121,8 @@ export default function HomeScreen() {
               </View>
               <Text style={styles.heroHeart}>♡</Text>
             </View>
+
+            {weeklySummaryEnabled ? <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={[styles.summaryIcon, { backgroundColor: "#F6DED0" }]}><MaterialIcons name="insights" size={20} color={colors.primary} /></View><View className="flex-1 mr-3"><Text className="text-base font-bold text-foreground">ملخص هذا الأسبوع</Text><Text className="text-sm text-muted mt-1">{weeklySummary.recorded ? `متوسط المزاج ${weeklySummary.average.toFixed(1)} من 5 عبر ${weeklySummary.recorded} تسجيلات` : "لم تُسجل مشاعر هذا الأسبوع بعد"}</Text></View></View> : null}
 
             <View className="flex-row items-center justify-between mt-8 mb-3">
               <Text className="text-xl font-bold text-foreground">أفرادك اليوم</Text>
@@ -195,6 +216,8 @@ const styles = StyleSheet.create({
   memberCard: { minHeight: 92, borderRadius: 20, borderWidth: 1, padding: 14, marginBottom: 10, flexDirection: "row", alignItems: "center" },
   memberAvatar: { width: 54, height: 54, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   memberAvatarText: { fontSize: 22, fontWeight: "700", color: "#5C4438" },
+  summaryCard: { borderRadius: 20, borderWidth: 1, padding: 14, flexDirection: "row", alignItems: "center", marginTop: 14 },
+  summaryIcon: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   reminderCard: { borderRadius: 20, padding: 16, flexDirection: "row", alignItems: "center" },
   reminderIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.55)", alignItems: "center", justifyContent: "center" },
   addButton: { borderWidth: 1, borderStyle: "dashed", borderRadius: 18, minHeight: 54, alignItems: "center", justifyContent: "center", flexDirection: "row", marginTop: 14 },
