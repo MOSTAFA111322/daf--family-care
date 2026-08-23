@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Modal,
@@ -10,12 +10,13 @@ import {
   View,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
+import { calculateWeeklySummary } from "@/lib/family-care";
 
-type MoodEntry = { score: number; date: string };
+type MoodEntry = { mood: string; score: number; date: string };
 type FamilyMember = {
   id: string;
   name: string;
@@ -50,21 +51,22 @@ export default function HomeScreen() {
     });
   }, []);
 
-  useEffect(() => {
-    const loadWeeklySummary = async () => {
-      const enabled = await AsyncStorage.getItem("dafء-weekly-summary");
-      setWeeklySummaryEnabled(enabled !== "false");
-      const saved = await AsyncStorage.getItem("dafء-members");
-      const list: FamilyMember[] = saved ? JSON.parse(saved) : initialMembers;
-      const histories = await Promise.all(list.map(async (item) => {
-        const raw = await AsyncStorage.getItem(`dafء-moods-${item.id}`);
-        return raw ? (JSON.parse(raw) as MoodEntry[]).slice(-7) : [];
-      }));
-      const entries = histories.flat();
-      setWeeklySummary({ recorded: entries.length, average: entries.length ? entries.reduce((sum, item) => sum + item.score, 0) / entries.length : 0 });
-    };
-    loadWeeklySummary();
+  const loadWeeklySummary = useCallback(async () => {
+    const enabled = await AsyncStorage.getItem("dafء-weekly-summary");
+    setWeeklySummaryEnabled(enabled !== "false");
+    const saved = await AsyncStorage.getItem("dafء-members");
+    const list: FamilyMember[] = saved ? JSON.parse(saved) : initialMembers;
+    const histories = await Promise.all(list.map(async (item) => {
+      const raw = await AsyncStorage.getItem(`dafء-moods-${item.id}`);
+      return { entries: raw ? (JSON.parse(raw) as MoodEntry[]) : [] };
+    }));
+    const summary = calculateWeeklySummary(histories);
+    setWeeklySummary({ recorded: summary.recorded, average: summary.average });
   }, []);
+
+  useFocusEffect(useCallback(() => {
+    loadWeeklySummary();
+  }, [loadWeeklySummary]));
 
   const saveMembers = async (next: FamilyMember[]) => {
     setMembers(next);
