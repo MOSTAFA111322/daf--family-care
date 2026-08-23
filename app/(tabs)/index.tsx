@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -97,6 +98,28 @@ export default function HomeScreen() {
     setShowAddMember(false);
   };
 
+  const closeCheckIn = () => {
+    if (!note.trim()) {
+      setSelectedMember(null);
+      return;
+    }
+    Alert.alert("ملاحظة غير محفوظة", "لديك نص لم يتم حفظه. هل تريد إغلاق النموذج؟", [
+      { text: "متابعة الكتابة", style: "cancel" },
+      { text: "إغلاق دون حفظ", style: "destructive", onPress: () => { setNote(""); setSelectedMember(null); } },
+    ]);
+  };
+
+  const closeAddMember = () => {
+    if (!newName.trim() && !newRole.trim()) {
+      setShowAddMember(false);
+      return;
+    }
+    Alert.alert("بيانات غير محفوظة", "لديك بيانات لم يتم حفظها. هل تريد إغلاق النموذج؟", [
+      { text: "متابعة الإدخال", style: "cancel" },
+      { text: "إغلاق دون حفظ", style: "destructive", onPress: () => { setNewName(""); setNewRole(""); setShowAddMember(false); } },
+    ]);
+  };
+
   return (
     <ScreenContainer className="px-5 pt-4" containerClassName="bg-background">
       <FlatList
@@ -134,6 +157,9 @@ export default function HomeScreen() {
         }
         renderItem={({ item }) => (
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`فتح ملف ${item.name}`}
+            accessibilityHint="عرض تفاصيل المتابعة والمشاعر والمناسبات"
             onPress={() => router.push({ pathname: "/member/[id]", params: { id: item.id } })}
             style={({ pressed }) => [styles.memberCard, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && styles.pressed]}
           >
@@ -168,7 +194,7 @@ export default function HomeScreen() {
               </View>
               <MaterialIcons name="chevron-left" size={22} color={colors.muted} />
             </View>
-            <Pressable onPress={() => setShowAddMember(true)} style={({ pressed }) => [styles.addButton, { borderColor: colors.primary }, pressed && styles.pressed]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="إضافة فرد من الأسرة" onPress={() => setShowAddMember(true)} style={({ pressed }) => [styles.addButton, { borderColor: colors.primary }, pressed && styles.pressed]}>
               <MaterialIcons name="person-add" size={20} color={colors.primary} />
               <Text className="font-bold text-primary mr-2">إضافة فرد من الأسرة</Text>
             </Pressable>
@@ -176,22 +202,22 @@ export default function HomeScreen() {
         }
       />
 
-      <Modal visible={Boolean(selectedMember)} transparent animationType="slide" onRequestClose={() => setSelectedMember(null)}>
+      <Modal visible={Boolean(selectedMember)} transparent animationType="slide" onRequestClose={closeCheckIn}>
         <View style={styles.modalBackdrop}>
           <View style={[styles.sheet, { backgroundColor: colors.background }]}>
             <View style={styles.sheetHandle} />
             <Text className="text-2xl font-bold text-foreground">اطمئن على {selectedMember?.name}</Text>
             <Text className="text-sm text-muted mt-2 mb-5">ما الشيء الصغير الذي تريد تذكره اليوم؟</Text>
             <TextInput value={note} onChangeText={setNote} placeholder="اكتب ملاحظة دافئة..." placeholderTextColor={colors.muted} multiline style={[styles.input, { borderColor: colors.border, color: colors.foreground }]} />
-            <Pressable onPress={saveNote} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.primary }, pressed && styles.pressed]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="حفظ المتابعة" onPress={saveNote} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.primary }, pressed && styles.pressed]}>
               <Text className="text-white font-bold text-base">حفظ المتابعة</Text>
             </Pressable>
-            <Pressable onPress={() => setSelectedMember(null)} style={styles.cancelButton}><Text className="font-bold text-muted">ليس الآن</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="إغلاق متابعة الفرد دون حفظ" onPress={closeCheckIn} style={styles.cancelButton}><Text className="font-bold text-muted">ليس الآن</Text></Pressable>
           </View>
         </View>
       </Modal>
 
-      <Modal visible={showAddMember} transparent animationType="slide" onRequestClose={() => setShowAddMember(false)}>
+      <Modal visible={showAddMember} transparent animationType="slide" onRequestClose={closeAddMember}>
         <View style={styles.modalBackdrop}>
           <View style={[styles.sheet, { backgroundColor: colors.background }]}>
             <View style={styles.sheetHandle} />
@@ -200,7 +226,7 @@ export default function HomeScreen() {
             <TextInput value={newName} onChangeText={setNewName} placeholder="الاسم" placeholderTextColor={colors.muted} style={[styles.inputSingle, { borderColor: colors.border, color: colors.foreground }]} />
             <TextInput value={newRole} onChangeText={setNewRole} placeholder="صلة القرابة (اختياري)" placeholderTextColor={colors.muted} style={[styles.inputSingle, { borderColor: colors.border, color: colors.foreground }]} />
             <Pressable onPress={addMember} style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.primary }, pressed && styles.pressed]}><Text className="text-white font-bold text-base">إضافة إلى الأسرة</Text></Pressable>
-            <Pressable onPress={() => setShowAddMember(false)} style={styles.cancelButton}><Text className="font-bold text-muted">إلغاء</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="إلغاء إضافة فرد" onPress={closeAddMember} style={styles.cancelButton}><Text className="font-bold text-muted">إلغاء</Text></Pressable>
           </View>
         </View>
       </Modal>

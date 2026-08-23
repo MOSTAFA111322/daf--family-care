@@ -3,20 +3,267 @@ import * as Notifications from "expo-notifications";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 
 type EventItem = { id: string; title: string; date: string; person: string; reminderDays: number };
 type Member = { id: string; name: string; role: string };
-const initialEvents: EventItem[] = [{ id: "1", title: "نشاط عمر المدرسي", date: "2026-08-27", person: "عمر", reminderDays: 2 }];
-Notifications.setNotificationHandler({ handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }) });
+
+const initialEvents: EventItem[] = [
+  { id: "1", title: "نشاط عمر المدرسي", date: "2026-08-27", person: "عمر", reminderDays: 2 },
+];
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function EventsScreen() {
-  const colors = useColors(); const [events, setEvents] = useState<EventItem[]>(initialEvents); const [visible, setVisible] = useState(false); const [title, setTitle] = useState(""); const [date, setDate] = useState(""); const [person, setPerson] = useState(""); const [reminderDays, setReminderDays] = useState(1); const [month, setMonth] = useState(new Date()); const [selectedPerson, setSelectedPerson] = useState("الكل"); const [members, setMembers] = useState<Member[]>([]);
-  useEffect(() => { AsyncStorage.getItem("dafء-events").then((saved) => saved && setEvents(JSON.parse(saved))); AsyncStorage.getItem("dafء-members").then((saved) => saved && setMembers(JSON.parse(saved))); }, []);
-  const days = useMemo(() => { const year = month.getFullYear(); const m = month.getMonth(); const first = new Date(year, m, 1).getDay(); const count = new Date(year, m + 1, 0).getDate(); return [...Array(first === 0 ? 6 : first - 1).fill(null), ...Array.from({ length: count }, (_, i) => `${year}-${String(m + 1).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`)]; }, [month]);
-  const addEvent = async () => { if (!title.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { Alert.alert("بيانات ناقصة", "اكتب التاريخ بصيغة السنة-الشهر-اليوم، مثل 2026-09-12."); return; } const item = { id: Date.now().toString(), title: title.trim(), date, person: person.trim() || "الأسرة", reminderDays }; const next = [...events, item]; setEvents(next); await AsyncStorage.setItem("dafء-events", JSON.stringify(next)); if (Platform.OS !== "web") { const status = (await Notifications.requestPermissionsAsync()).status; if (status === "granted") { const target = new Date(`${date}T09:00:00`); target.setDate(target.getDate() - reminderDays); if (target.getTime() > Date.now()) await Notifications.scheduleNotificationAsync({ content: { title: "تذكير من دفء", body: `${item.title} — ${item.person}` }, trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: target } }); } } setTitle(""); setDate(""); setPerson(""); setReminderDays(1); setVisible(false); Alert.alert("تمت الإضافة", `سيتم تذكيرك قبل المناسبة بـ ${item.reminderDays} يوم.`); };
-  const monthLabel = month.toLocaleDateString("ar-SA", { month: "long", year: "numeric" }); const visibleEvents = events.filter((event) => event.date.startsWith(`${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`) && (selectedPerson === "الكل" || event.person === selectedPerson));
-  return <ScreenContainer className="px-5 pt-4"><View className="flex-row items-center justify-between mb-5"><View><Text className="text-sm text-muted">لحظات تستحق التذكر</Text><Text className="text-3xl font-bold text-foreground">تقويم المناسبات</Text></View><Pressable onPress={() => setVisible(true)} style={[styles.add, { backgroundColor: colors.primary }]}><MaterialIcons name="add" size={24} color="white" /></Pressable></View><View style={[styles.calendar, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={styles.monthHeader}><Pressable onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}><MaterialIcons name="chevron-right" size={24} color={colors.primary} /></Pressable><Text className="text-base font-bold text-foreground">{monthLabel}</Text><Pressable onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}><MaterialIcons name="chevron-left" size={24} color={colors.primary} /></Pressable></View><View style={styles.week}><Text className="text-xs text-muted">الإثنين</Text><Text className="text-xs text-muted">الثلاثاء</Text><Text className="text-xs text-muted">الأربعاء</Text><Text className="text-xs text-muted">الخميس</Text><Text className="text-xs text-muted">الجمعة</Text><Text className="text-xs text-muted">السبت</Text><Text className="text-xs text-muted">الأحد</Text></View><View style={styles.grid}>{days.map((day, i) => { const hasEvent = day && visibleEvents.some((event) => event.date === day); return <View key={`${day}-${i}`} style={styles.dayWrap}>{day ? <View style={[styles.day, hasEvent && { backgroundColor: "#F6DED0" }]}><Text className="text-sm text-foreground">{Number(day.slice(-2))}</Text>{hasEvent && <View style={[styles.dot, { backgroundColor: colors.primary }]} />}</View> : null}</View>; })}</View></View><Text className="text-xl font-bold text-foreground mt-7 mb-3">المواعيد القادمة</Text><View style={styles.filters}><Pressable onPress={() => setSelectedPerson("الكل")} style={[styles.filter, { borderColor: selectedPerson === "الكل" ? colors.primary : colors.border, backgroundColor: selectedPerson === "الكل" ? "#F6DED0" : colors.surface }]}><Text className="text-sm text-foreground">كل الأسرة</Text></Pressable>{members.map((member) => <Pressable key={member.id} onPress={() => setSelectedPerson(member.name)} style={[styles.filter, { borderColor: selectedPerson === member.name ? colors.primary : colors.border, backgroundColor: selectedPerson === member.name ? "#F6DED0" : colors.surface }]}><Text className="text-sm text-foreground">{member.name}</Text></Pressable>)}</View>{visibleEvents.map((item) => <View key={item.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}><View style={styles.eventIcon}><MaterialIcons name="event" size={23} color={colors.primary} /></View><View className="flex-1 mr-3"><Text className="text-base font-bold text-foreground">{item.title}</Text><Text className="text-sm text-muted mt-1">{item.person} · {item.date}</Text><Text className="text-xs text-success mt-2">تذكير قبل {item.reminderDays} {item.reminderDays === 1 ? "يوم" : "أيام"}</Text></View></View>)}<Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}><View style={styles.backdrop}><View style={[styles.sheet, { backgroundColor: colors.background }]}><View style={styles.handle} /><Text className="text-2xl font-bold text-foreground">مناسبة جديدة</Text><Text className="text-sm text-muted mt-2 mb-5">استخدم التاريخ بصيغة 2026-09-12.</Text><TextInput value={title} onChangeText={setTitle} placeholder="اسم المناسبة" placeholderTextColor={colors.muted} style={[styles.input, { borderColor: colors.border, color: colors.foreground }]} /><TextInput value={person} onChangeText={setPerson} placeholder="لمن؟ (اختياري)" placeholderTextColor={colors.muted} style={[styles.input, { borderColor: colors.border, color: colors.foreground }]} /><TextInput value={date} onChangeText={setDate} placeholder="التاريخ: 2026-09-12" placeholderTextColor={colors.muted} style={[styles.input, { borderColor: colors.border, color: colors.foreground }]} /><Text className="text-sm text-muted mb-2">التذكير قبل المناسبة</Text><View style={styles.reminderRow}>{[0, 1, 2, 7].map((value) => <Pressable key={value} onPress={() => setReminderDays(value)} style={[styles.reminder, { borderColor: reminderDays === value ? colors.primary : colors.border, backgroundColor: reminderDays === value ? "#F6DED0" : colors.background }]}><Text className="text-sm text-foreground">{value === 0 ? "نفس اليوم" : `${value} ${value === 1 ? "يوم" : "أيام"}`}</Text></Pressable>)}</View><Pressable onPress={addEvent} style={[styles.save, { backgroundColor: colors.primary }]}><Text className="text-white font-bold">حفظ وتفعيل التذكير</Text></Pressable><Pressable onPress={() => setVisible(false)} style={styles.cancel}><Text className="text-muted font-bold">إلغاء</Text></Pressable></View></View></Modal></ScreenContainer>;
+  const colors = useColors();
+  const [events, setEvents] = useState<EventItem[]>(initialEvents);
+  const [visible, setVisible] = useState(false);
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState("");
+  const [person, setPerson] = useState("");
+  const [reminderDays, setReminderDays] = useState(1);
+  const [month, setMonth] = useState(new Date());
+  const [selectedPerson, setSelectedPerson] = useState("الكل");
+  const [members, setMembers] = useState<Member[]>([]);
+
+  useEffect(() => {
+    AsyncStorage.getItem("dafء-events").then((saved) => saved && setEvents(JSON.parse(saved)));
+    AsyncStorage.getItem("dafء-members").then((saved) => saved && setMembers(JSON.parse(saved)));
+  }, []);
+
+  const days = useMemo(() => {
+    const year = month.getFullYear();
+    const monthIndex = month.getMonth();
+    const first = new Date(year, monthIndex, 1).getDay();
+    const count = new Date(year, monthIndex + 1, 0).getDate();
+    const emptyDays = first === 0 ? 6 : first - 1;
+    return [
+      ...Array(emptyDays).fill(null),
+      ...Array.from({ length: count }, (_, index) =>
+        `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(index + 1).padStart(2, "0")}`,
+      ),
+    ];
+  }, [month]);
+
+  const closeEventForm = () => {
+    if (!title.trim() && !date.trim() && !person.trim()) {
+      setVisible(false);
+      return;
+    }
+    Alert.alert("بيانات غير محفوظة", "لديك بيانات مناسبة لم يتم حفظها. هل تريد إغلاق النموذج؟", [
+      { text: "متابعة الإدخال", style: "cancel" },
+      {
+        text: "إغلاق دون حفظ",
+        style: "destructive",
+        onPress: () => {
+          setTitle("");
+          setDate("");
+          setPerson("");
+          setReminderDays(1);
+          setVisible(false);
+        },
+      },
+    ]);
+  };
+
+  const addEvent = async () => {
+    if (!title.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      Alert.alert("بيانات ناقصة", "اكتب التاريخ بصيغة السنة-الشهر-اليوم، مثل 2026-09-12.");
+      return;
+    }
+    const item = {
+      id: Date.now().toString(),
+      title: title.trim(),
+      date,
+      person: person.trim() || "الأسرة",
+      reminderDays,
+    };
+    const next = [...events, item];
+    setEvents(next);
+    await AsyncStorage.setItem("dafء-events", JSON.stringify(next));
+    if (Platform.OS !== "web") {
+      const status = (await Notifications.requestPermissionsAsync()).status;
+      if (status === "granted") {
+        const target = new Date(`${date}T09:00:00`);
+        target.setDate(target.getDate() - reminderDays);
+        if (target.getTime() > Date.now()) {
+          await Notifications.scheduleNotificationAsync({
+            content: { title: "تذكير من دفء", body: `${item.title} — ${item.person}` },
+            trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: target },
+          });
+        }
+      }
+    }
+    setTitle("");
+    setDate("");
+    setPerson("");
+    setReminderDays(1);
+    setVisible(false);
+    Alert.alert("تمت الإضافة", `سيتم تذكيرك قبل المناسبة بـ ${item.reminderDays} يوم.`);
+  };
+
+  const monthLabel = month.toLocaleDateString("ar-SA", { month: "long", year: "numeric" });
+  const monthKey = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
+  const visibleEvents = events.filter(
+    (event) => event.date.startsWith(monthKey) && (selectedPerson === "الكل" || event.person === selectedPerson),
+  );
+
+  return (
+    <ScreenContainer className="px-5 pt-4">
+      <View className="flex-row items-center justify-between mb-5">
+        <View>
+          <Text className="text-sm text-muted">لحظات تستحق التذكر</Text>
+          <Text className="text-3xl font-bold text-foreground">تقويم المناسبات</Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="إضافة مناسبة جديدة"
+          onPress={() => setVisible(true)}
+          style={[styles.add, { backgroundColor: colors.primary }]}
+        >
+          <MaterialIcons name="add" size={24} color="white" />
+        </Pressable>
+      </View>
+
+      <View style={[styles.calendar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={styles.monthHeader}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="الشهر السابق"
+            onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+          >
+            <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
+          </Pressable>
+          <Text className="text-base font-bold text-foreground">{monthLabel}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="الشهر التالي"
+            onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+          >
+            <MaterialIcons name="chevron-left" size={24} color={colors.primary} />
+          </Pressable>
+        </View>
+        <View style={styles.week}>
+          {['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'].map((day) => (
+            <Text key={day} className="text-xs text-muted">{day}</Text>
+          ))}
+        </View>
+        <View style={styles.grid}>
+          {days.map((day, index) => {
+            const hasEvent = Boolean(day && visibleEvents.some((event) => event.date === day));
+            return (
+              <View key={`${day}-${index}`} style={styles.dayWrap}>
+                {day ? (
+                  <View style={[styles.day, hasEvent && { backgroundColor: "#F6DED0" }]}>
+                    <Text className="text-sm text-foreground">{Number(day.slice(-2))}</Text>
+                    {hasEvent ? <View style={[styles.dot, { backgroundColor: colors.primary }]} /> : null}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
+      <Text className="text-xl font-bold text-foreground mt-7 mb-3">المواعيد القادمة</Text>
+      <View style={styles.filters}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="عرض مناسبات كل الأسرة"
+          onPress={() => setSelectedPerson("الكل")}
+          style={[styles.filter, { borderColor: selectedPerson === "الكل" ? colors.primary : colors.border, backgroundColor: selectedPerson === "الكل" ? "#F6DED0" : colors.surface }]}
+        >
+          <Text className="text-sm text-foreground">كل الأسرة</Text>
+        </Pressable>
+        {members.map((member) => (
+          <Pressable
+            key={member.id}
+            accessibilityRole="button"
+            accessibilityLabel={`عرض مناسبات ${member.name}`}
+            onPress={() => setSelectedPerson(member.name)}
+            style={[styles.filter, { borderColor: selectedPerson === member.name ? colors.primary : colors.border, backgroundColor: selectedPerson === member.name ? "#F6DED0" : colors.surface }]}
+          >
+            <Text className="text-sm text-foreground">{member.name}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {visibleEvents.map((item) => (
+        <View key={item.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.eventIcon}><MaterialIcons name="event" size={23} color={colors.primary} /></View>
+          <View className="flex-1 mr-3">
+            <Text className="text-base font-bold text-foreground">{item.title}</Text>
+            <Text className="text-sm text-muted mt-1">{item.person} · {item.date}</Text>
+            <Text className="text-xs text-success mt-2">تذكير قبل {item.reminderDays} {item.reminderDays === 1 ? "يوم" : "أيام"}</Text>
+          </View>
+        </View>
+      ))}
+
+      <Modal visible={visible} transparent animationType="slide" onRequestClose={closeEventForm}>
+        <View style={styles.backdrop}>
+          <View style={[styles.sheet, { backgroundColor: colors.background }]}>
+            <View style={styles.handle} />
+            <Text className="text-2xl font-bold text-foreground">مناسبة جديدة</Text>
+            <Text className="text-sm text-muted mt-2 mb-5">استخدم التاريخ بصيغة 2026-09-12.</Text>
+            <TextInput accessibilityLabel="اسم المناسبة" value={title} onChangeText={setTitle} placeholder="اسم المناسبة" placeholderTextColor={colors.muted} style={[styles.input, { borderColor: colors.border, color: colors.foreground }]} />
+            <TextInput accessibilityLabel="صاحب المناسبة اختياري" value={person} onChangeText={setPerson} placeholder="لمن؟ (اختياري)" placeholderTextColor={colors.muted} style={[styles.input, { borderColor: colors.border, color: colors.foreground }]} />
+            <TextInput accessibilityLabel="تاريخ المناسبة" value={date} onChangeText={setDate} placeholder="التاريخ: 2026-09-12" placeholderTextColor={colors.muted} style={[styles.input, { borderColor: colors.border, color: colors.foreground }]} />
+            <Text className="text-sm text-muted mb-2">التذكير قبل المناسبة</Text>
+            <View style={styles.reminderRow}>
+              {[0, 1, 2, 7].map((value) => (
+                <Pressable
+                  key={value}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: reminderDays === value }}
+                  accessibilityLabel={value === 0 ? "التذكير في نفس اليوم" : `التذكير قبل ${value} ${value === 1 ? "يوم" : "أيام"}`}
+                  onPress={() => setReminderDays(value)}
+                  style={[styles.reminder, { borderColor: reminderDays === value ? colors.primary : colors.border, backgroundColor: reminderDays === value ? "#F6DED0" : colors.background }]}
+                >
+                  <Text className="text-sm text-foreground">{value === 0 ? "نفس اليوم" : `${value} ${value === 1 ? "يوم" : "أيام"}`}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="حفظ المناسبة وتفعيل التذكير" onPress={addEvent} style={[styles.save, { backgroundColor: colors.primary }]}>
+              <Text className="text-white font-bold">حفظ وتفعيل التذكير</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="إلغاء إضافة المناسبة" onPress={closeEventForm} style={styles.cancel}>
+              <Text className="text-muted font-bold">إلغاء</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </ScreenContainer>
+  );
 }
-const styles = StyleSheet.create({ add: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" }, calendar: { borderRadius: 22, borderWidth: 1, padding: 14 }, monthHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }, week: { flexDirection: "row-reverse", justifyContent: "space-between", marginBottom: 8 }, grid: { flexDirection: "row-reverse", flexWrap: "wrap" }, dayWrap: { width: `${100 / 7}%`, alignItems: "center", minHeight: 40 }, day: { width: 31, height: 31, borderRadius: 16, alignItems: "center", justifyContent: "center" }, dot: { width: 4, height: 4, borderRadius: 2, marginTop: 1 }, filters: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 7, marginBottom: 12 }, filter: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 14, borderWidth: 1 }, card: { minHeight: 80, borderRadius: 19, borderWidth: 1, padding: 14, flexDirection: "row", alignItems: "center", marginBottom: 10 }, eventIcon: { width: 52, height: 54, borderRadius: 16, backgroundColor: "#FFF0E8", alignItems: "center", justifyContent: "center" }, backdrop: { flex: 1, backgroundColor: "rgba(45,41,38,0.32)", justifyContent: "flex-end" }, sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, paddingBottom: 34 }, handle: { width: 42, height: 4, borderRadius: 4, backgroundColor: "#D5C7BC", alignSelf: "center", marginBottom: 22 }, input: { height: 52, borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, fontSize: 16, marginBottom: 10, textAlign: "right" }, reminderRow: { flexDirection: "row-reverse", gap: 7, marginBottom: 15, flexWrap: "wrap" }, reminder: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, borderWidth: 1 }, save: { height: 52, borderRadius: 16, alignItems: "center", justifyContent: "center" }, cancel: { height: 46, alignItems: "center", justifyContent: "center" } });
+
+const styles = StyleSheet.create({
+  add: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  calendar: { borderRadius: 22, borderWidth: 1, padding: 14 },
+  monthHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  week: { flexDirection: "row-reverse", justifyContent: "space-between", marginBottom: 8 },
+  grid: { flexDirection: "row-reverse", flexWrap: "wrap" },
+  dayWrap: { width: `${100 / 7}%`, alignItems: "center", minHeight: 40 },
+  day: { width: 31, height: 31, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  dot: { width: 4, height: 4, borderRadius: 2, marginTop: 1 },
+  filters: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 7, marginBottom: 12 },
+  filter: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 14, borderWidth: 1 },
+  card: { minHeight: 80, borderRadius: 19, borderWidth: 1, padding: 14, flexDirection: "row", alignItems: "center", marginBottom: 10 },
+  eventIcon: { width: 52, height: 54, borderRadius: 16, backgroundColor: "#FFF0E8", alignItems: "center", justifyContent: "center" },
+  backdrop: { flex: 1, backgroundColor: "rgba(45,41,38,0.32)", justifyContent: "flex-end" },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, paddingBottom: 34 },
+  handle: { width: 42, height: 4, borderRadius: 4, backgroundColor: "#D5C7BC", alignSelf: "center", marginBottom: 22 },
+  input: { height: 52, borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, fontSize: 16, marginBottom: 10, textAlign: "right" },
+  reminderRow: { flexDirection: "row-reverse", gap: 7, marginBottom: 15, flexWrap: "wrap" },
+  reminder: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, borderWidth: 1 },
+  save: { height: 52, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  cancel: { height: 46, alignItems: "center", justifyContent: "center" },
+});
