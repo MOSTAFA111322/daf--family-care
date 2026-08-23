@@ -5,6 +5,14 @@ export type ReportLogActionFilter = "all" | ReportAction;
 export type ReportLogPeriodFilter = "all" | "today" | "7days" | "30days" | "custom";
 export type ReportLogCustomRange = { from: string; to: string };
 
+export function validateReportLogCustomRange(range: ReportLogCustomRange): string | null {
+  const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && Date.parse(`${value}T00:00:00Z`) >= 0 && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+  if (!range.from || !range.to) return "أدخل تاريخ البداية والنهاية بصيغة YYYY-MM-DD.";
+  if (!isIsoDate(range.from) || !isIsoDate(range.to)) return "تحقق من صحة التاريخ؛ استخدم الصيغة YYYY-MM-DD.";
+  if (range.from > range.to) return "يجب أن يسبق تاريخ البداية تاريخ النهاية أو يساويه.";
+  return null;
+}
+
 export type ReportOperation = {
   id: string;
   action: ReportAction;
@@ -68,9 +76,9 @@ export function filterReportOperations(
   let cutoff: number | null = period === "today" ? startOfToday : period === "7days" ? now - 7 * 24 * 60 * 60 * 1000 : period === "30days" ? now - 30 * 24 * 60 * 60 * 1000 : null;
   let customEnd: number | null = null;
   if (period === "custom") {
+    if (validateReportLogCustomRange(customRange)) return [];
     const from = Date.parse(`${customRange.from}T00:00:00`);
     const to = Date.parse(`${customRange.to}T23:59:59.999`);
-    if (!Number.isFinite(from) || !Number.isFinite(to) || from > to) return [];
     cutoff = from;
     customEnd = to;
   }
