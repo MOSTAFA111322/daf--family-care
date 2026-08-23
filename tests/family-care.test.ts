@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildFamilyReportHtml, calculateWeeklySummary } from "../lib/family-care";
-import { appendReportOperation, clearReportOperations, createReportOperation, DEFAULT_REPORT_STATUS_DURATIONS, dismissStatusMessage, getReportStatusDuration, getStatusExpiry, isStatusMessageVisible, toggleSortDirection } from "../lib/report-ui";
+import { appendReportOperation, clearReportOperations, createReportOperation, DEFAULT_REPORT_STATUS_DURATIONS, dismissStatusMessage, filterReportOperations, getReportStatusDuration, getStatusExpiry, isStatusMessageVisible, removeReportOperation, toggleSortDirection } from "../lib/report-ui";
 
 describe("family care analytics", () => {
   it("updates the weekly family summary after a new mood entry", () => {
@@ -41,6 +41,20 @@ describe("family care analytics", () => {
     const operation = createReportOperation("share", "2026-08-23T12:00:00.000Z");
     expect(appendReportOperation([], operation)).toEqual([operation]);
     expect(clearReportOperations()).toEqual([]);
+  });
+
+  it("filters report operations by action and time period and removes one operation", () => {
+    const now = new Date("2026-08-23T12:00:00.000Z").getTime();
+    const create = createReportOperation("create", "2026-08-23T10:00:00.000Z");
+    const share = createReportOperation("share", "2026-08-10T10:00:00.000Z");
+    const download = createReportOperation("download", "2026-08-22T10:00:00.000Z");
+    const history = [create, share, download];
+
+    expect(filterReportOperations(history, "create", "all", now)).toEqual([create]);
+    expect(filterReportOperations(history, "all", "7days", now)).toEqual([create, download]);
+    expect(filterReportOperations(history, "all", "today", now)).toEqual([create]);
+    expect(removeReportOperation(history, share.id)).toEqual([create, download]);
+    expect(removeReportOperation(history, "missing")).toEqual(history);
   });
 
   it("builds a safe family report even when a member has no entries", () => {

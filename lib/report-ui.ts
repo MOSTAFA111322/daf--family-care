@@ -1,6 +1,8 @@
 export type SortDirection = "asc" | "desc";
 export type ReportAction = "create" | "share" | "download";
 export type ReportStatusDurations = Record<ReportAction, number>;
+export type ReportLogActionFilter = "all" | ReportAction;
+export type ReportLogPeriodFilter = "all" | "today" | "7days" | "30days";
 
 export type ReportOperation = {
   id: string;
@@ -47,6 +49,27 @@ export function appendReportOperation(history: ReportOperation[], operation: Rep
 
 export function clearReportOperations(): ReportOperation[] {
   return [];
+}
+
+export function removeReportOperation(history: ReportOperation[], operationId: string): ReportOperation[] {
+  return history.filter((operation) => operation.id !== operationId);
+}
+
+export function filterReportOperations(
+  history: ReportOperation[],
+  action: ReportLogActionFilter = "all",
+  period: ReportLogPeriodFilter = "all",
+  now = Date.now(),
+): ReportOperation[] {
+  const reference = new Date(now);
+  const startOfToday = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate()).getTime();
+  const cutoff = period === "today" ? startOfToday : period === "7days" ? now - 7 * 24 * 60 * 60 * 1000 : period === "30days" ? now - 30 * 24 * 60 * 60 * 1000 : null;
+  return history.filter((operation) => {
+    if (action !== "all" && operation.action !== action) return false;
+    if (cutoff === null) return true;
+    const timestamp = Date.parse(operation.createdAt);
+    return Number.isFinite(timestamp) && timestamp >= cutoff;
+  });
 }
 
 export function getStatusDurationLabel(durationMs: number): string {
