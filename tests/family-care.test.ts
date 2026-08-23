@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildFamilyReportHtml, calculateWeeklySummary } from "../lib/family-care";
-import { appendReportOperation, clearReportOperations, createReportOperation, DEFAULT_REPORT_STATUS_DURATIONS, dismissStatusMessage, filterReportOperations, getReportStatusDuration, getStatusExpiry, isStatusMessageVisible, removeReportOperation, toggleSortDirection } from "../lib/report-ui";
+import { appendReportOperation, buildReportOperationsCsv, clearReportOperations, createReportOperation, DEFAULT_REPORT_STATUS_DURATIONS, dismissStatusMessage, filterReportOperations, getReportStatusDuration, getStatusExpiry, isStatusMessageVisible, removeReportOperation, toggleSortDirection } from "../lib/report-ui";
 
 describe("family care analytics", () => {
   it("updates the weekly family summary after a new mood entry", () => {
@@ -53,8 +53,14 @@ describe("family care analytics", () => {
     expect(filterReportOperations(history, "create", "all", now)).toEqual([create]);
     expect(filterReportOperations(history, "all", "7days", now)).toEqual([create, download]);
     expect(filterReportOperations(history, "all", "today", now)).toEqual([create]);
+    expect(filterReportOperations(history, "all", "custom", now, { from: "2026-08-22", to: "2026-08-23" })).toEqual([create, download]);
+    expect(filterReportOperations(history, "all", "custom", now, { from: "2026-08-24", to: "2026-08-23" })).toEqual([]);
     expect(removeReportOperation(history, share.id)).toEqual([create, download]);
     expect(removeReportOperation(history, "missing")).toEqual(history);
+    const csv = buildReportOperationsCsv([createReportOperation("share", "2026-08-23T12:00:00.000Z")]);
+    expect(csv).toContain("المعرّف,العملية,التاريخ".replaceAll(",", '\",\"'));
+    expect(csv).toContain("مشاركة تقرير");
+    expect(csv.endsWith("\n")).toBe(true);
   });
 
   it("builds a safe family report even when a member has no entries", () => {
